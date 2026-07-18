@@ -1,5 +1,8 @@
 /**
  * Canvas rendering utilities for Zervi Pattern Platform.
+ * CAD coordinates: X right, Y up.
+ * Canvas coordinates: X right, Y down.
+ * We flip Y when rendering.
  */
 
 export const COLORS = {
@@ -30,9 +33,11 @@ export function renderPattern(ctx, pattern, view) {
 	ctx.clearRect(0, 0, width, height);
 	ctx.save();
 
-	// Apply view transform
-	ctx.translate(offsetX, offsetY);
-	ctx.scale(scale, scale);
+	// Apply view transform with Y-flip:
+	// 1. Move origin to (offsetX, offsetY + height)
+	// 2. Scale X by scale, Y by -scale (flip Y)
+	ctx.translate(offsetX, offsetY + height);
+	ctx.scale(scale, -scale);
 
 	// Draw panel fills first
 	if (pattern.panels) {
@@ -73,7 +78,12 @@ export function renderPattern(ctx, pattern, view) {
 			ctx.font = `${(label.height || 10) * 0.8}px Arial`;
 			ctx.textAlign = 'center';
 			ctx.textBaseline = 'middle';
-			ctx.fillText(label.text, label.position[0], label.position[1]);
+			// Text needs to be flipped back so it reads correctly
+			ctx.save();
+			ctx.translate(label.position[0], label.position[1]);
+			ctx.scale(1, -1);
+			ctx.fillText(label.text, 0, 0);
+			ctx.restore();
 		}
 	}
 

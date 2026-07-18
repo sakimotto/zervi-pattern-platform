@@ -57,12 +57,13 @@
 		const mx = e.clientX - rect.left;
 		const my = e.clientY - rect.top;
 
+		// World coords before zoom (accounting for Y-flip)
 		const wx = (mx - view.offsetX) / view.scale;
-		const wy = (my - view.offsetY) / view.scale;
+		const wy = (view.offsetY + view.height - my) / view.scale;
 
 		view.scale *= zoom;
 		view.offsetX = mx - wx * view.scale;
-		view.offsetY = my - wy * view.scale;
+		view.offsetY = my - (view.height - wy * view.scale);
 		render();
 	}
 
