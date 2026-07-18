@@ -2,310 +2,214 @@
 
 ## 1. Overview
 
-The Zervi Pattern Platform is an AI-first, agent-native system that converts car seat cover DXF/DWG drawings into structured, reusable manufacturing intelligence.
+The Zervi Pattern Platform is an AI-first design intelligence system for car seat cover manufacturing. It is **not** a CAD replacement. Engineers continue to draw in their existing 2D CAD tools (progeCAD, LibreCAD, AutoCAD). The platform imports the DXF files they export, structures the data, and provides a web-based viewer and editor for pattern analysis, hierarchy management, and multi-level BOM generation.
 
-Engineers continue to use their preferred 2D CAD application (progeCAD, LibreCAD, AutoCAD). They export drawings using the Zervi DXF Template. The platform ingests these files, runs specialist AI agents to understand them, stores the results in a PostgreSQL + pgvector database, and exposes everything through a web UI and Odoo integration.
+Major geometry changes (e.g., extending seam allowances, splitting assemblies) are performed by AI agents with specialized skills, not by generic CAD editing tools.
 
-## 2. High-Level Architecture
+## 2. Core Principles
+
+1. **CAD-agnostic:** Engineers keep their existing tools. DXF is the interchange format.
+2. **Design intelligence first:** Viewing, structuring, and analyzing patterns is the primary job.
+3. **Basic editing, agent-driven major work:** Small edits in UI; big changes via agents.
+4. **Multi-level BOM is core:** Break single-level patterns into driver/passenger/cushion/seatback/headrest/sub-assemblies.
+5. **Local-first, Odoo-integrated:** Data lives in PostgreSQL + pgvector; BOMs sync to Odoo when ready.
+
+## 3. High-Level Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           Client Layer                                   │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐  │
-│  │ Pattern      │  │ Agent        │  │ BOM &        │  │ Work        │  │
-│  │ Library      │  │ Chat /       │  │ Costing      │  │ Instructions│  │
-│  │ Viewer       │  │ Approvals    │  │              │  │             │  │
-│  └──────────────┘  └──────────────┘  └──────────────┘  └─────────────┘  │
-│                              SvelteKit + Canvas                         │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼ HTTP / WebSocket
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           API / Agent Layer                              │
-│  ┌──────────────────────────────────────────────────────────────────┐   │
-│  │                      Agent Orchestrator                           │   │
-│  │  • Task routing  • Workflow state  • Human approvals  • Logging   │   │
-│  └──────────────────────────────────────────────────────────────────┘   │
-│       │            │            │            │            │             │
-│       ▼            ▼            ▼            ▼            ▼             │
-│  ┌────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │ DXF    │  │ Pattern  │  │ BOM      │  │ Validator│  │ Work     │   │
-│  │ Parser │  │ Matcher  │  │ Generator│  │ Agent    │  │ Instr.   │   │
-│  │ Agent  │  │ Agent    │  │ Agent    │  │          │  │ Agent    │   │
-│  └────────┘  └──────────┘  └──────────┐  ┌──────────┘  └──────────┘   │
-│       │            │            │     │  │     │            │          │
-│       └────────────┴────────────┘     │  │     └────────────┘          │
-│                                       │  │                               │
-│  ┌────────────────────────────────────┘  └──────────────────────────┐   │
-│  │                         Shared Tools & Skills                      │   │
-│  │  DXF read/write • Geometry ops • Embedding model • Odoo client     │   │
-│  └──────────────────────────────────────────────────────────────────┘   │
-│                              Python + FastAPI                           │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼ SQL
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         Data Layer                                       │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐  │
-│  │ PostgreSQL   │  │ pgvector     │  │ File Store   │  │ Vector      │  │
-│  │ structured   │  │ embeddings   │  │ DXF originals│  │ memory      │  │
-│  │ data         │  │ & search     │  │ & exports    │  │ & cache     │  │
-│  └──────────────┘  └──────────────┘  └──────────────┘  └─────────────┘  │
-│                      Reuses existing Saki AI Postgres on Elest.io         │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼ XML-RPC / JSON-RPC
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         Odoo ERP                                         │
-│  Products • BOMs • Routings • Inventory • Costing • Manufacturing Orders │
-└─────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    progeCAD / LibreCAD / AutoCAD                 │
+│                      (Engineers draw here)                       │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+                    Export DXF (Zervi template)
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                    Zervi Pattern Platform                        │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  Web UI (SvelteKit + Canvas)                            │    │
+│  │  • 2D pattern viewer (layers, fonts, notes)            │    │
+│  │  • Hierarchy editor (group panels into assemblies)      │    │
+│  │  • Basic edits (labels, names, minor tweaks)            │    │
+│  │  • BOM viewer & editor                                  │    │
+│  │  • Agent chat / approval panel                          │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                              ↓                                  │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  Agent Runtime (Python)                                  │    │
+│  │  • DXF Parser Agent                                      │    │
+│  │  • Hierarchy Builder Agent                               │    │
+│  │  • BOM Generator Agent                                   │    │
+│  │  • Seam Extension Agent                                  │    │
+│  │  • Odoo Sync Agent                                       │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                              ↓                                  │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  PostgreSQL + pgvector                                   │    │
+│  │  • Patterns, panels, labels, holes                       │    │
+│  │  • Assemblies (multi-level BOM)                          │    │
+│  │  • Embeddings for part matching                          │    │
+│  │  • Agent memory                                          │    │
+│  └─────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                         Odoo ERP                                 │
+│              Products • BOMs • Routings • Costing                │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-## 3. Data Model
+## 4. Data Model
 
-### 3.1 Core Entities
+### 4.1 Multi-Level BOM Structure
 
-| Entity | Description |
-|--------|-------------|
-| `Pattern` | One DXF file representing a pattern set for a vehicle/row/position. |
-| `Panel` | A single cut piece of fabric (e.g., THSBS204). |
-| `Hole` | A notch, grommet, or mounting hole inside a panel. |
-| `Label` | Text found in the DXF: part number, panel number, dimension, etc. |
-| `Block` | A reusable component (e.g., standard hook tab, headrest slot). |
-| `BOMLine` | One line of a bill of materials for a pattern. |
-| `Operation` | A manufacturing step: cut, sew, overlock, attach hardware. |
-| `WorkInstruction` | Multimedia step-by-step guide linked to operations. |
-| `Vehicle` | Car model, year, trim, market. |
-| `Material` | Fabric, thread, hardware specification. |
-| `AgentRun` | Log of an agent task, input, output, confidence, approval state. |
+The most important design decision is the **assembly hierarchy**. A seat cover pattern is decomposed like this:
 
-### 3.2 PostgreSQL Schema (Initial)
+```
+Vehicle Pattern (e.g., Hyundai Staria 3rd Row)
+├── DRIVER SIDE
+│   ├── CUSHION COVER
+│   │   ├── Main Panel (THSBS201)
+│   │   ├── Side Panel (THSBS202)
+│   │   ├── Hook Tab (THSBS203)
+│   │   └── Notches / Grommets
+│   ├── SEAT BACK COVER
+│   │   ├── Main Panel (THSBS204)
+│   │   ├── Side Panel (THSBS205)
+│   │   └── Headrest Sleeve (THSBS206)
+│   └── HEADREST COVER
+│       ├── Main Panel (THSBS207)
+│       └── Grommets (x2)
+└── PASSENGER SIDE
+    └── (mirror of driver side)
+```
+
+This hierarchy is stored as a tree in PostgreSQL:
 
 ```sql
-CREATE EXTENSION IF NOT EXISTS vector;
-
-CREATE TABLE vehicles (
+CREATE TABLE assemblies (
     id SERIAL PRIMARY KEY,
-    name TEXT NOT NULL,
-    make TEXT,
-    model TEXT,
-    year_start INT,
-    year_end INT,
-    market TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE patterns (
-    id SERIAL PRIMARY KEY,
-    vehicle_id INT REFERENCES vehicles(id),
-    name TEXT NOT NULL,
-    row_position TEXT,
-    seat_position TEXT,
-    file_path TEXT,
-    dxf_hash TEXT UNIQUE,
-    status TEXT DEFAULT 'draft', -- draft, validated, approved, archived
-    metadata JSONB,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE panels (
-    id SERIAL PRIMARY KEY,
+    parent_id INT REFERENCES assemblies(id) ON DELETE CASCADE,
     pattern_id INT REFERENCES patterns(id) ON DELETE CASCADE,
-    panel_number TEXT,
-    part_number TEXT,
-    material_code TEXT,
-    geometry JSONB NOT NULL,
-    area_mm2 NUMERIC,
-    cut_length_mm NUMERIC,
-    bounding_box JSONB,
-    centroid JSONB,
-    embedding VECTOR(1536),
-    status TEXT DEFAULT 'draft',
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    name TEXT NOT NULL, -- e.g., DRIVER SIDE, CUSHION COVER
+    assembly_type TEXT, -- side, component, sub_component
+    sort_order INT,
+    metadata JSONB
 );
 
-CREATE TABLE labels (
-    id SERIAL PRIMARY KEY,
-    pattern_id INT REFERENCES patterns(id) ON DELETE CASCADE,
-    panel_id INT REFERENCES panels(id) ON DELETE SET NULL,
-    text TEXT,
-    layer TEXT,
-    label_type TEXT,
-    position JSONB,
-    height NUMERIC,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE holes (
-    id SERIAL PRIMARY KEY,
+CREATE TABLE assembly_panels (
+    assembly_id INT REFERENCES assemblies(id) ON DELETE CASCADE,
     panel_id INT REFERENCES panels(id) ON DELETE CASCADE,
-    center_x NUMERIC,
-    center_y NUMERIC,
-    radius_mm NUMERIC,
-    diameter_mm NUMERIC,
-    classification TEXT, -- notch, grommet, hole
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    quantity INT DEFAULT 1,
+    PRIMARY KEY (assembly_id, panel_id)
 );
-
-CREATE TABLE blocks (
-    id SERIAL PRIMARY KEY,
-    name TEXT NOT NULL,
-    category TEXT,
-    geometry JSONB NOT NULL,
-    embedding VECTOR(1536),
-    usage_count INT DEFAULT 0,
-    metadata JSONB,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE bom_lines (
-    id SERIAL PRIMARY KEY,
-    pattern_id INT REFERENCES patterns(id) ON DELETE CASCADE,
-    panel_id INT REFERENCES panels(id) ON DELETE SET NULL,
-    material_code TEXT,
-    description TEXT,
-    quantity NUMERIC,
-    unit TEXT,
-    cost_local NUMERIC,
-    odoo_product_id INT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE operations (
-    id SERIAL PRIMARY KEY,
-    pattern_id INT REFERENCES patterns(id) ON DELETE CASCADE,
-    panel_id INT REFERENCES panels(id) ON DELETE SET NULL,
-    sequence INT,
-    operation_type TEXT, -- cut, sew, overlock, attach, mark
-    description TEXT,
-    metadata JSONB,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE work_instructions (
-    id SERIAL PRIMARY KEY,
-    operation_id INT REFERENCES operations(id) ON DELETE CASCADE,
-    step_number INT,
-    title TEXT,
-    description TEXT,
-    media_urls TEXT[],
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE knowledge (
-    id SERIAL PRIMARY KEY,
-    title TEXT,
-    content TEXT,
-    embedding VECTOR(1536),
-    source TEXT,
-    tags TEXT[],
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE agent_runs (
-    id SERIAL PRIMARY KEY,
-    agent_name TEXT NOT NULL,
-    task TEXT NOT NULL,
-    input JSONB,
-    output JSONB,
-    confidence NUMERIC,
-    human_approved BOOLEAN DEFAULT NULL,
-    approved_by TEXT,
-    approved_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX idx_panels_embedding ON panels USING ivfflat (embedding vector_cosine_ops);
-CREATE INDEX idx_blocks_embedding ON blocks USING ivfflat (embedding vector_cosine_ops);
-CREATE INDEX idx_knowledge_embedding ON knowledge USING ivfflat (embedding vector_cosine_ops);
 ```
 
-## 4. Agent System
+### 4.2 Core Tables
 
-### 4.1 Agent Orchestrator
+| Table | Purpose |
+|-------|---------|
+| `patterns` | One DXF file, linked to vehicle |
+| `panels` | Cut pieces of fabric with geometry |
+| `labels` | Text entities (part numbers, panel numbers, dimensions) |
+| `holes` | Notches, grommets, mounting holes |
+| `assemblies` | Multi-level BOM tree |
+| `bom_lines` | Generated BOM items per assembly |
+| `agent_runs` | Log of agent tasks and approvals |
 
-The orchestrator receives a task, selects the right agent(s), manages state, logs decisions, and requests human approval when confidence is low.
+### 4.3 pgvector Usage
 
-Tasks can be:
-- `parse_dxf` — ingest a new file
-- `match_parts` — find similar parts across patterns
-- `generate_bom` — build BOM for a pattern
-- `validate_pattern` — check compliance
-- `create_work_instructions` — generate sewing/CNC guides
-- `sync_to_odoo` — push to ERP
+- Panel geometry embeddings for similarity search
+- Block/component embeddings for reuse suggestions
+- Knowledge base embeddings for AI context
 
-### 4.2 Specialist Agents
+## 5. Agent System
 
-| Agent | Input | Output | Tools |
-|-------|-------|--------|-------|
-| DXF Parser Agent | Raw DXF bytes | Patterns, Panels, Labels, Holes | dxf-parser, geometry ops |
-| Pattern Classifier Agent | Pattern metadata + labels | Vehicle/row/position | knowledge base, regex |
-| Part Matching Agent | Panel embeddings | Similarity groups, block candidates | pgvector, geometry comparison |
-| BOM Generator Agent | Panels + holes + materials | BOM lines | material catalog, costing rules |
-| Validator Agent | Pattern + panels + rules | Validation report | geometry checks, template rules |
-| Work Instruction Agent | Operations + pattern | Step-by-step guides | template library, media builder |
-| Odoo Sync Agent | BOM + products | Odoo records | Odoo XML-RPC/JSON-RPC |
-| Naming Agent | Labels + positions | Standardized names | naming conventions |
+### 5.1 Simple Agent Runtime
 
-### 4.3 Skills
+We do not need LangGraph initially. A lightweight Python agent runtime is enough:
 
-Skills are reusable functions agents can call:
+- Task queue (in-memory or Redis)
+- Agent registry
+- Skill registry
+- Approval workflow
+- Structured logging
+
+### 5.2 Specialist Agents
+
+| Agent | What It Does | Example Task |
+|-------|------------|--------------|
+| DXF Parser Agent | Reads DXF, extracts entities | “Parse this file into panels, labels, holes” |
+| Hierarchy Builder Agent | Suggests assembly grouping | “Group these panels into driver/passenger/cushion/seatback” |
+| BOM Generator Agent | Builds multi-level BOM | “Generate BOM for Hyundai Staria 3rd row” |
+| Seam Extension Agent | Modifies geometry | “Extend seam allowance on all cushion covers by 10mm” |
+| Odoo Sync Agent | Pushes BOM to ERP | “Create BOM lines in Odoo for this pattern” |
+
+### 5.3 Skills
+
+Reusable functions agents can call:
 
 - `extract_closed_panels(entities)`
-- `snap_endpoints(segments, tolerance)`
-- `classify_hole(radius)`
 - `match_label_to_panel(labels, panels)`
-- `compute_cut_length(geometry)`
-- `embed_geometry(geometry)`
-- `compare_panel_shapes(a, b)`
-- `validate_hole_inside_boundary(hole, panel)`
-- `generate_odoo_product_payload(panel)`
+- `classify_hole(radius)`
+- `suggest_assembly_grouping(panels, naming_rules)`
+- `compute_bom_for_assembly(assembly)`
+- `extend_seam_allowance(panel, distance)`
+- `generate_odoo_bom_line(assembly)`
 
-## 5. DXF Template
+## 6. DXF Template
 
-To import reliably, exported DXF files should follow this layer convention:
+Engineers must export DXF using these layers:
 
 | Layer | Contents |
 |-------|----------|
-| `Z_CUT` | Outer boundaries, slots, any cut path |
-| `Z_NOTCH` | Notch / mounting holes (circles) |
+| `Z_CUT` | Outer boundaries, slots |
+| `Z_NOTCH` | Notch / mounting holes |
 | `Z_STITCH` | Stitch / seam lines |
 | `Z_TEXT_PARTNO` | Part numbers (e.g., CGA10APH70) |
 | `Z_TEXT_PANELNO` | Panel numbers (e.g., RB1, THSBS204) |
-| `Z_TEXT_ITEMNO` | Item/hardware labels (e.g., a, b, c) |
+| `Z_TEXT_ITEMNO` | Item labels (e.g., a, b, c) |
 | `Z_DIM` | Dimensions |
 | `Z_HOOK` | Hook locations |
 | `Z_LOOP` | Loop locations |
-| `Z_JOIN` | Join / spline paths |
+| `Z_JOIN` | Join paths |
 | `Z_MARK` | Marking points |
 
 Rules:
-1. Explode all blocks before export.
-2. One pattern set per DXF file.
-3. Text labels should be near the geometry they describe.
-4. Closed shapes must actually close (tiny gaps are OK, agent will snap).
+1. Explode blocks before export.
+2. One pattern set per DXF.
+3. Text labels near the geometry they describe.
+4. Closed shapes should close (small gaps OK).
 
-## 6. Security & Privacy
+## 7. Editing vs. Agent Work
 
-- All files processed locally by default.
-- Database credentials stored in Infisical, never in code.
-- LLM calls can be routed through local models or approved APIs.
-- No customer vehicle data leaves Zervi infrastructure without approval.
+| Type | Done By | Examples |
+|------|---------|----------|
+| Basic edits | User in UI | Rename panel, change label, move text, adjust notch size |
+| Major geometry | Agent with skills | Extend seam allowance, split cushion cover into sub-panels, mirror driver to passenger |
+| Analysis | Agent with skills | Classify holes, match parts, suggest blocks |
+| Integration | Agent with skills | Sync BOM to Odoo |
 
-## 7. Integration with Zervi AI Toolkit
+## 8. Security & Privacy
 
-The platform reuses:
-- Skill definitions from `zervi-ai-toolkit`
+- Local-first by default.
+- Database credentials in Infisical.
+- LLM calls can be routed to local models or approved APIs.
+- No customer data leaves Zervi without approval.
+
+## 9. Integration with Zervi AI Toolkit
+
+Reuses:
+- Skill definitions
 - Handover note conventions
-- Agent identity and auth patterns
+- Agent identity patterns
 - Session-start protocol
 
-## 8. Future Extensions
+## 10. Future Extensions (Not Now)
 
 - 2D constraint solver for parametric patterns
-- Nesting optimization integration
+- Nesting optimization
 - CNC G-code generation
 - 3D seat cover preview
-- Supplier quote integration
-- Customer-facing configurator
+- Supplier quotes
+- Customer configurator

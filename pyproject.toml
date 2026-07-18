@@ -1,7 +1,7 @@
 [project]
 name = "zervi-pattern-platform"
 version = "0.1.0"
-description = "AI-first pattern intelligence system for Zervi car seat cover manufacturing"
+description = "AI-first design intelligence system for Zervi car seat cover manufacturing"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.111.0",
@@ -14,8 +14,6 @@ dependencies = [
     "ezdxf>=1.3.0",
     "shapely>=2.0.4",
     "numpy>=1.26.0",
-    "langgraph>=0.0.65",
-    "langchain>=0.2.0",
     "openai>=1.30.0",
     "pydantic-settings>=2.2.1",
     "python-multipart>=0.0.9",

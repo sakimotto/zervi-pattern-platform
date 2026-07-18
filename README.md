@@ -1,18 +1,12 @@
 # Zervi Pattern Platform
 
-AI-first pattern intelligence system for Zervi car seat cover manufacturing.
+AI-first design intelligence system for Zervi car seat cover manufacturing.
 
 ## Vision
 
-Transform thousands of DXF/DWG pattern files into a searchable, reusable, AI-enhanced design database. Engineers keep using progeCAD or any 2D CAD tool. They export DXF using a Zervi template. The platform does the rest:
+Engineers continue to draw in their existing 2D CAD tools (progeCAD, LibreCAD, AutoCAD). The platform imports the DXF files they export, structures the data into PostgreSQL + pgvector, and provides a web-based viewer and editor for pattern analysis, hierarchy management, and multi-level BOM generation.
 
-- Parse and validate patterns
-- Extract panels, parts, notches, seams, labels
-- Match similar parts across vehicles
-- Build reusable blocks
-- Generate BOMs and costs
-- Create multimedia work instructions
-- Sync with Odoo ERP
+Major geometry changes are performed by AI agents with specialized skills, not by generic CAD editing tools.
 
 ## Repository Structure
 
@@ -24,7 +18,7 @@ zervi-pattern-platform/
 ├── packages/
 │   ├── dxf-parser/          # DXF/DWG parsing and normalization
 │   ├── pattern-engine/      # 2D geometry, panels, validation
-│   ├── agent-runtime/       # Multi-agent orchestration
+│   ├── agent-runtime/       # Lightweight agent orchestration
 │   └── odoo-bridge/         # Odoo XML-RPC/JSON-RPC integration
 ├── db/
 │   └── migrations/          # PostgreSQL + pgvector schema
@@ -38,10 +32,10 @@ zervi-pattern-platform/
 
 ## Key Principles
 
-1. **AI-first:** Specialist agents perform parsing, matching, validation, and documentation tasks.
-2. **Local-first:** Runs locally by default; syncs to cloud/Elestio services when configured.
+1. **Design intelligence first:** Viewing, structuring, and analyzing patterns is the primary job.
+2. **Basic editing, agent-driven major work:** Small edits in UI; big changes via specialist agents.
 3. **CAD-agnostic:** Engineers keep their existing CAD tools. DXF is the interchange format.
-4. **Reusable:** Patterns decompose into blocks, parts, and operations that can be reused across vehicles.
+4. **Multi-level BOM is core:** Break single-level patterns into driver/passenger/cushion/seatback/headrest assemblies.
 5. **Odoo-integrated:** BOMs, inventory, costing, and manufacturing orders flow into Odoo.
 
 ## Tech Stack
@@ -51,7 +45,7 @@ zervi-pattern-platform/
 | Frontend | SvelteKit, TailwindCSS, TypeScript |
 | 2D Canvas | Fabric.js / Paper.js |
 | Backend | Python, FastAPI |
-| Agents | LangGraph + custom skills |
+| Agents | Simple Python runtime + custom skills |
 | LLM | DeepSeek / Kimi / OpenAI |
 | Database | PostgreSQL + pgvector |
 | Vector search | pgvector |
