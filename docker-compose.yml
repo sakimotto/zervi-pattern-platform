@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  db:
+    image: ankane/pgvector:latest
+    container_name: zervi-pattern-db
+    environment:
+      POSTGRES_USER: zervi
+      POSTGRES_PASSWORD: zervi_dev
+      POSTGRES_DB: zervi_pattern
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zervi -d zervi_pattern"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

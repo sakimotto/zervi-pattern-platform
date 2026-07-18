@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Build outputs
+apps/web/.svelte-kit/
+apps/web/build/
+apps/web/dist/
+apps/api/dist/
+packages/*/dist/
+packages/*/build/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Database
+postgres_data/
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploads / temp
+uploads/
+tmp/
+temp/
+
+# Test coverage
+.coverage/
+htmlcov/
+.pytest_cache/
