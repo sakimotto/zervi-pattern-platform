@@ -89,7 +89,7 @@
 
 	function resizeCanvas() {
 		if (!canvas) return;
-		const parent = canvasEl.parentElement;
+		const parent = canvasEl.closest('.fabric-container') || canvasEl.parentElement;
 		canvas.setWidth(parent.clientWidth);
 		canvas.setHeight(parent.clientHeight);
 		canvas.renderAll();
@@ -277,4 +277,16 @@
 	}
 </script>
 
-<canvas bind:this={canvasEl} class="w-full h-full" />
+<div class="fabric-container w-full h-full relative">
+	<canvas bind:this={canvasEl} />
+</div>
+
+<style>
+	.fabric-container {
+		overflow: hidden;
+	}
+	.fabric-container :global(.canvas-container) {
+		width: 100% !important;
+		height: 100% !important;
+	}
+</style>
