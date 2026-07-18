@@ -52,7 +52,7 @@
 
 	function render() {
 		if (!ctx || !pattern) return;
-		renderPattern(ctx, pattern, view);
+		renderPattern(ctx, pattern, view, visibleLayers, selectedPanel?.id);
 	}
 
 	function onWheel(e) {
@@ -103,7 +103,16 @@
 
 	function selectPanel(panel) {
 		selectedPanel = panel;
+		render();
 	}
+
+	$: filteredHoles = selectedPanel
+		? pattern.holes.filter((h) => h.inside_panel_id === selectedPanel.id)
+		: [];
+
+	$: filteredLabels = selectedPanel
+		? pattern.labels.filter((l) => l.linked_panel_id === selectedPanel.id)
+		: [];
 </script>
 
 <div class="h-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden">
@@ -177,9 +186,11 @@
 				{/if}
 
 				<div>
-					<h3 class="text-xs font-semibold text-[var(--text-secondary)] uppercase mb-2">Holes ({pattern.holes?.length || 0})</h3>
+					<h3 class="text-xs font-semibold text-[var(--text-secondary)] uppercase mb-2">
+						Holes ({selectedPanel ? filteredHoles.length : 0})
+					</h3>
 					<div class="text-sm space-y-1 max-h-48 overflow-y-auto">
-						{#each pattern.holes as hole}
+						{#each filteredHoles as hole}
 							<div class="px-2 py-1 rounded bg-[var(--bg-elevated)]">
 								<span class="text-[var(--success)]">{hole.classification}</span>
 								<span class="text-[var(--text-secondary)]"> r={hole.radius_mm}mm</span>
@@ -189,9 +200,11 @@
 				</div>
 
 				<div>
-					<h3 class="text-xs font-semibold text-[var(--text-secondary)] uppercase mb-2">Labels ({pattern.labels?.length || 0})</h3>
+					<h3 class="text-xs font-semibold text-[var(--text-secondary)] uppercase mb-2">
+						Labels ({selectedPanel ? filteredLabels.length : 0})
+					</h3>
 					<div class="text-sm space-y-1 max-h-96 overflow-y-auto">
-						{#each pattern.labels as label}
+						{#each filteredLabels as label}
 							<div class="px-2 py-1 rounded bg-[var(--bg-elevated)]">
 								<span style="color:{getLayerColor(label.layer)}">{label.text}</span>
 							</div>

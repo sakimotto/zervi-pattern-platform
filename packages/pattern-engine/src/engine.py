@@ -34,6 +34,7 @@ class Hole:
     radius_mm: float
     diameter_mm: float
     classification: str
+    layer: str = "0"
     inside_panel_id: str | None = None
 
 
@@ -156,6 +157,7 @@ def analyze_pattern(path: Path) -> Pattern:
                     radius_mm=radius,
                     diameter_mm=radius * 2,
                     classification=classification,
+                    layer=entity.layer,
                 )
             )
         elif entity.type in ("TEXT", "MTEXT") and entity.text:

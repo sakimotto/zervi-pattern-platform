@@ -28,7 +28,7 @@ export function getLayerColor(layer) {
 	return COLORS.TEXT;
 }
 
-export function renderPattern(ctx, pattern, view) {
+export function renderPattern(ctx, pattern, view, visibleLayers = null, selectedPanelId = null) {
 	const { width, height, scale, offsetX, offsetY } = view;
 	ctx.clearRect(0, 0, width, height);
 	ctx.save();
@@ -50,10 +50,11 @@ export function renderPattern(ctx, pattern, view) {
 					ctx.lineTo(pts[i][0], pts[i][1]);
 				}
 				ctx.closePath();
-				ctx.fillStyle = COLORS.PANEL_FILL;
+				const isSelected = selectedPanelId === panel.id;
+				ctx.fillStyle = isSelected ? 'rgba(249, 115, 22, 0.2)' : COLORS.PANEL_FILL;
 				ctx.fill();
-				ctx.strokeStyle = COLORS.PANEL_OUTLINE;
-				ctx.lineWidth = 1.5 / scale;
+				ctx.strokeStyle = isSelected ? COLORS.SELECTED : COLORS.PANEL_OUTLINE;
+				ctx.lineWidth = (isSelected ? 3 : 1.5) / scale;
 				ctx.stroke();
 			}
 		}
@@ -62,6 +63,7 @@ export function renderPattern(ctx, pattern, view) {
 	// Draw holes
 	if (pattern.holes) {
 		for (const hole of pattern.holes) {
+			if (visibleLayers && !visibleLayers.has(hole.layer)) continue;
 			ctx.beginPath();
 			ctx.arc(hole.center[0], hole.center[1], hole.radius_mm, 0, Math.PI * 2);
 			ctx.strokeStyle = hole.classification === 'notch' ? COLORS.NOTCH : COLORS.HOLE;
@@ -73,6 +75,7 @@ export function renderPattern(ctx, pattern, view) {
 	// Draw labels
 	if (pattern.labels) {
 		for (const label of pattern.labels) {
+			if (visibleLayers && !visibleLayers.has(label.layer)) continue;
 			if (!label.position || !label.text) continue;
 			ctx.fillStyle = getLayerColor(label.layer);
 			ctx.font = `${(label.height || 10) * 0.8}px Arial`;
