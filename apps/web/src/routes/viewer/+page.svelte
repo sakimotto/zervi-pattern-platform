@@ -21,22 +21,15 @@
 	let files = [];
 	let activeFile = null;
 	let showLibrary = false;
+	let editingPanel = null;
+	let editName = '';
 
 	onMount(async () => {
 		const stored = sessionStorage.getItem('zervi-pattern');
 		if (stored) {
 			try {
-				pattern = JSON.parse(stored);
-				files = [
-					{
-						name: pattern.filename || 'Untitled',
-						active: true,
-						dirty: false,
-						pattern
-					}
-				];
-				activeFile = files[0];
-				initLayers();
+				const initialPattern = JSON.parse(stored);
+				addFile(initialPattern);
 				await tick();
 				initCanvas();
 			} catch (e) {
@@ -44,6 +37,44 @@
 			}
 		}
 	});
+
+	function addFile(patternData) {
+		const newFile = {
+			name: patternData.filename || 'Untitled',
+			active: true,
+			dirty: false,
+			pattern: patternData
+		};
+		files = [...files.map((f) => ({ ...f, active: false })), newFile];
+		activeFile = newFile;
+		pattern = patternData;
+		initLayers();
+		fitView();
+	}
+
+	function switchToFile(file) {
+		files = files.map((f) => ({ ...f, active: f === file }));
+		activeFile = file;
+		pattern = file.pattern;
+		selectedPanel = null;
+		initLayers();
+		fitView();
+		render();
+	}
+
+	function closeFile(file) {
+		files = files.filter((f) => f !== file);
+		if (activeFile === file) {
+			activeFile = files[0] || null;
+			pattern = activeFile?.pattern || null;
+			selectedPanel = null;
+			if (pattern) {
+				initLayers();
+				fitView();
+				render();
+			}
+		}
+	}
 
 	function initLayers() {
 		if (pattern && pattern.layers) {
@@ -161,26 +192,11 @@
 	}
 
 	function handleFileSelect(e) {
-		const file = e.detail;
-		activeFile = file;
-		pattern = file.pattern;
-		initLayers();
-		fitView();
-		render();
+		switchToFile(e.detail);
 	}
 
 	function handleFileClose(e) {
-		const file = e.detail;
-		files = files.filter((f) => f !== file);
-		if (activeFile === file) {
-			activeFile = files[0] || null;
-			pattern = activeFile?.pattern || null;
-			if (pattern) {
-				initLayers();
-				fitView();
-				render();
-			}
-		}
+		closeFile(e.detail);
 	}
 
 	function handleNewFile() {
@@ -200,22 +216,42 @@
 				body: formData
 			});
 			const result = await response.json();
-			const newFile = {
-				name: result.filename || 'Untitled',
-				active: true,
-				dirty: false,
-				pattern: result
-			};
-			files = [...files.map((f) => ({ ...f, active: false })), newFile];
-			activeFile = newFile;
-			pattern = result;
-			initLayers();
-			fitView();
+			addFile(result);
 			render();
 		} catch (error) {
 			console.error(error);
 			alert('Upload failed');
 		}
+	}
+
+	function startEditPanel(panel) {
+		editingPanel = panel;
+		editName = panel.labels[0] || '';
+	}
+
+	function saveEditPanel() {
+		if (!editingPanel || !activeFile) return;
+
+		// Update the label in the pattern
+		const label = pattern.labels.find((l) => l.linked_panel_id === editingPanel.id);
+		if (label) {
+			label.text = editName;
+		}
+
+		// Update panel labels array
+		editingPanel.labels = [editName];
+
+		// Mark file as dirty
+		activeFile.dirty = true;
+
+		editingPanel = null;
+		editName = '';
+		render();
+	}
+
+	function cancelEditPanel() {
+		editingPanel = null;
+		editName = '';
 	}
 
 	$: filteredHoles = selectedPanel
@@ -305,12 +341,47 @@
 						<div class="text-sm space-y-1">
 							<div><span class="text-[var(--text-secondary)]">ID:</span> {selectedPanel.id}</div>
 							{#if selectedPanel.labels.length > 0}
-								<div><span class="text-[var(--text-secondary)]">Name:</span> {selectedPanel.labels[0]}</div>
+								<div class="flex items-center gap-2">
+									<span class="text-[var(--text-secondary)]">Name:</span>
+									<span>{selectedPanel.labels[0]}</span>
+									<button
+										on:click={() => startEditPanel(selectedPanel)}
+										class="text-xs text-[var(--accent)] hover:underline"
+									>
+										Edit
+									</button>
+								</div>
 							{/if}
 							<div><span class="text-[var(--text-secondary)]">Area:</span> {selectedPanel.area_mm2} mm²</div>
 							<div><span class="text-[var(--text-secondary)]">Cut Length:</span> {selectedPanel.cut_length_mm} mm</div>
 						</div>
 					</div>
+
+					{#if editingPanel}
+						<div class="p-3 bg-[var(--bg-elevated)] rounded border border-[var(--border-color)]">
+							<h4 class="text-xs font-semibold text-[var(--text-secondary)] uppercase mb-2">Edit Panel Name</h4>
+							<input
+								type="text"
+								bind:value={editName}
+								class="w-full px-2 py-1 text-sm bg-[var(--bg-primary)] border border-[var(--border-color)] rounded text-[var(--text-primary)] mb-2"
+								on:keydown={(e) => e.key === 'Enter' && saveEditPanel()}
+							/>
+							<div class="flex gap-2">
+								<button
+									on:click={saveEditPanel}
+									class="px-3 py-1 text-sm bg-[var(--accent)] text-white rounded hover:opacity-90"
+								>
+									Save
+								</button>
+								<button
+									on:click={cancelEditPanel}
+									class="px-3 py-1 text-sm bg-[var(--border-color)] text-[var(--text-primary)] rounded hover:opacity-90"
+								>
+									Cancel
+								</button>
+							</div>
+						</div>
+					{/if}
 				{/if}
 
 				<div>
