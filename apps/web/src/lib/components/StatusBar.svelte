@@ -32,7 +32,13 @@
 		<div class="h-3 w-px bg-[var(--border-color)]"></div>
 		<div class="flex items-center gap-2">
 			<span>Selected:</span>
-			<span class="text-[var(--accent)]">{selectedPanel.labels?.[0] || selectedPanel.id}</span>
+			<span class="text-[var(--accent)]">
+				{#if selectedPanel.length > 1}
+					{selectedPanel.length} panels
+				{:else}
+					{selectedPanel[0]?.labels?.[0] || selectedPanel[0]?.id}
+				{/if}
+			</span>
 		</div>
 	{/if}
 

@@ -1,6 +1,6 @@
 <script>
 	import { onMount, tick } from 'svelte';
-	import { renderPattern, fitToView, getLayerColor } from '$lib/canvas.js';
+	import { renderPattern, fitToView, getLayerColor, pointInPolygon } from '$lib/canvas.js';
 	import MenuBar from '$lib/components/MenuBar.svelte';
 	import RibbonTabs from '$lib/components/RibbonTabs.svelte';
 	import FileTabs from '$lib/components/FileTabs.svelte';
@@ -13,8 +13,11 @@
 	let ctx;
 	let view = { width: 0, height: 0, scale: 1, offsetX: 0, offsetY: 0 };
 	let isPanning = false;
+	let isSelecting = false;
 	let panStart = { x: 0, y: 0 };
-	let selectedPanel = null;
+	let selectStart = { x: 0, y: 0 };
+	let selectEnd = { x: 0, y: 0 };
+	let selectedPanels = [];
 	let visibleLayers = new Set();
 	let coordinates = { x: 0, y: 0 };
 
@@ -56,7 +59,7 @@
 		files = files.map((f) => ({ ...f, active: f === file }));
 		activeFile = file;
 		pattern = file.pattern;
-		selectedPanel = null;
+		selectedPanels = [];
 		initLayers();
 		fitView();
 		render();
@@ -67,7 +70,7 @@
 		if (activeFile === file) {
 			activeFile = files[0] || null;
 			pattern = activeFile?.pattern || null;
-			selectedPanel = null;
+			selectedPanels = [];
 			if (pattern) {
 				initLayers();
 				fitView();
@@ -103,7 +106,24 @@
 
 	function render() {
 		if (!ctx || !pattern) return;
-		renderPattern(ctx, pattern, view, visibleLayers, selectedPanel?.id);
+		renderPattern(ctx, pattern, view, visibleLayers, selectedPanels.map((p) => p.id));
+
+		// Draw rubber band selection rectangle
+		if (isSelecting) {
+			const minX = Math.min(selectStart.x, selectEnd.x);
+			const maxX = Math.max(selectStart.x, selectEnd.x);
+			const minY = Math.min(selectStart.y, selectEnd.y);
+			const maxY = Math.max(selectStart.y, selectEnd.y);
+
+			ctx.save();
+			ctx.strokeStyle = '#4f8cff';
+			ctx.fillStyle = 'rgba(79, 140, 255, 0.1)';
+			ctx.lineWidth = 1;
+			ctx.setLineDash([5, 5]);
+			ctx.fillRect(minX, minY, maxX - minX, maxY - minY);
+			ctx.strokeRect(minX, minY, maxX - minX, maxY - minY);
+			ctx.restore();
+		}
 	}
 
 	function onWheel(e) {
@@ -123,30 +143,107 @@
 	}
 
 	function onMouseDown(e) {
-		isPanning = true;
-		panStart = { x: e.clientX, y: e.clientY };
-		canvas.style.cursor = 'grabbing';
-	}
-
-	function onMouseMove(e) {
-		if (!isPanning) {
-			// Update coordinates
+		if (e.button === 0) {
+			// Left click: check if clicking on a panel
 			const rect = canvas.getBoundingClientRect();
 			const mx = e.clientX - rect.left;
 			const my = e.clientY - rect.top;
+			const worldX = (mx - view.offsetX) / view.scale;
+			const worldY = (view.offsetY + view.height - my) / view.scale;
+
+			// Find panel under click
+			const clickedPanel = pattern.panels.find((panel) => pointInPolygon([worldX, worldY], panel.polygon));
+
+			if (clickedPanel) {
+				if (e.ctrlKey || e.metaKey) {
+					// Ctrl+click: toggle selection
+					if (selectedPanels.find((p) => p.id === clickedPanel.id)) {
+						selectedPanels = selectedPanels.filter((p) => p.id !== clickedPanel.id);
+					} else {
+						selectedPanels = [...selectedPanels, clickedPanel];
+					}
+				} else {
+					// Single click: select only this panel
+					selectedPanels = [clickedPanel];
+				}
+				render();
+				return;
+			}
+
+			// No panel clicked: start rubber band selection
+			isSelecting = true;
+			selectStart = { x: mx, y: my };
+			selectEnd = { x: mx, y: my };
+		} else if (e.button === 1 || e.button === 2) {
+			// Middle or right click: pan
+			isPanning = true;
+			panStart = { x: e.clientX, y: e.clientY };
+			canvas.style.cursor = 'grabbing';
+		}
+	}
+
+	function onMouseMove(e) {
+		const rect = canvas.getBoundingClientRect();
+		const mx = e.clientX - rect.left;
+		const my = e.clientY - rect.top;
+
+		if (!isPanning && !isSelecting) {
+			// Update coordinates
 			coordinates = {
 				x: (mx - view.offsetX) / view.scale,
 				y: (view.offsetY + view.height - my) / view.scale
 			};
 			return;
 		}
-		view.offsetX += e.clientX - panStart.x;
-		view.offsetY += e.clientY - panStart.y;
-		panStart = { x: e.clientX, y: e.clientY };
-		render();
+
+		if (isSelecting) {
+			selectEnd = { x: mx, y: my };
+			render();
+			return;
+		}
+
+		if (isPanning) {
+			view.offsetX += e.clientX - panStart.x;
+			view.offsetY += e.clientY - panStart.y;
+			panStart = { x: e.clientX, y: e.clientY };
+			render();
+		}
 	}
 
-	function onMouseUp() {
+	function onMouseUp(e) {
+		if (isSelecting) {
+			// Finish rubber band selection
+			const minX = Math.min(selectStart.x, selectEnd.x);
+			const maxX = Math.max(selectStart.x, selectEnd.x);
+			const minY = Math.min(selectStart.y, selectEnd.y);
+			const maxY = Math.max(selectStart.y, selectEnd.y);
+
+			// Convert to world coordinates
+			const worldMinX = (minX - view.offsetX) / view.scale;
+			const worldMaxX = (maxX - view.offsetX) / view.scale;
+			const worldMinY = (view.offsetY + view.height - maxY) / view.scale;
+			const worldMaxY = (view.offsetY + view.height - minY) / view.scale;
+
+			// Select panels whose centroid is inside the rubber band
+			const newSelection = pattern.panels.filter((panel) => {
+				const cx = panel.centroid[0];
+				const cy = panel.centroid[1];
+				return cx >= worldMinX && cx <= worldMaxX && cy >= worldMinY && cy <= worldMaxY;
+			});
+
+			if (e.ctrlKey || e.metaKey) {
+				// Add to selection
+				const newIds = new Set([...selectedPanels.map((p) => p.id), ...newSelection.map((p) => p.id)]);
+				selectedPanels = pattern.panels.filter((p) => newIds.has(p.id));
+			} else {
+				selectedPanels = newSelection;
+			}
+
+			isSelecting = false;
+			render();
+			return;
+		}
+
 		isPanning = false;
 		canvas.style.cursor = 'grab';
 	}
@@ -162,7 +259,12 @@
 	}
 
 	function selectPanel(panel) {
-		selectedPanel = panel;
+		// Toggle selection when clicking panel in sidebar
+		if (selectedPanels.find((p) => p.id === panel.id)) {
+			selectedPanels = selectedPanels.filter((p) => p.id !== panel.id);
+		} else {
+			selectedPanels = [...selectedPanels, panel];
+		}
 		render();
 	}
 
@@ -259,15 +361,16 @@
 	}
 
 	async function exportSelectedPanel() {
-		if (!selectedPanel) return;
+		if (selectedPanels.length === 0) return;
 
-		const filename = selectedPanel.labels[0] || selectedPanel.id;
+		const panel = selectedPanels[0];
+		const filename = panel.labels[0] || panel.id;
 		try {
 			const response = await fetch('/api/v1/patterns/export-panel', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
-					panel: selectedPanel,
+					panel,
 					holes: pattern.holes,
 					labels: pattern.labels,
 					filename
@@ -291,13 +394,15 @@
 		}
 	}
 
-	$: filteredHoles = selectedPanel
-		? pattern.holes.filter((h) => h.inside_panel_id === selectedPanel.id)
-		: [];
+	$: filteredHoles =
+		selectedPanels.length > 0
+			? pattern.holes.filter((h) => selectedPanels.some((p) => p.id === h.inside_panel_id))
+			: [];
 
-	$: filteredLabels = selectedPanel
-		? pattern.labels.filter((l) => l.linked_panel_id === selectedPanel.id)
-		: [];
+	$: filteredLabels =
+		selectedPanels.length > 0
+			? pattern.labels.filter((l) => selectedPanels.some((p) => p.id === l.linked_panel_id))
+			: [];
 </script>
 
 <svelte:head>
@@ -348,7 +453,7 @@
 						{#each pattern.panels as panel}
 							<button
 								on:click={() => selectPanel(panel)}
-								class="w-full text-left text-sm px-2 py-1 rounded hover:bg-[var(--bg-elevated)] {selectedPanel?.id === panel.id ? 'bg-[var(--accent)] text-white' : ''}"
+								class="w-full text-left text-sm px-2 py-1 rounded hover:bg-[var(--bg-elevated)] {selectedPanels.some((p) => p.id === panel.id) ? 'bg-[var(--accent)] text-white' : ''}"
 							>
 								{panel.labels.length > 0 ? panel.labels[0] : panel.id}
 							</button>
@@ -372,25 +477,21 @@
 
 			<!-- Right Sidebar -->
 			<div class="w-80 bg-[var(--bg-secondary)] border-l border-[var(--border-color)] overflow-y-auto p-3 space-y-4">
-				{#if selectedPanel}
+				{#if selectedPanels.length > 0}
 					<div>
-						<h3 class="text-xs font-semibold text-[var(--text-secondary)] uppercase mb-2">Selected Panel</h3>
-						<div class="text-sm space-y-1">
-							<div><span class="text-[var(--text-secondary)]">ID:</span> {selectedPanel.id}</div>
-							{#if selectedPanel.labels.length > 0}
-								<div class="flex items-center gap-2">
-									<span class="text-[var(--text-secondary)]">Name:</span>
-									<span>{selectedPanel.labels[0]}</span>
+						<h3 class="text-xs font-semibold text-[var(--text-secondary)] uppercase mb-2">Selected Panels ({selectedPanels.length})</h3>
+						<div class="text-sm space-y-1 max-h-40 overflow-y-auto">
+							{#each selectedPanels as panel}
+								<div class="px-2 py-1 rounded bg-[var(--bg-elevated)] flex items-center justify-between">
+									<span>{panel.labels.length > 0 ? panel.labels[0] : panel.id}</span>
 									<button
-										on:click={() => startEditPanel(selectedPanel)}
+										on:click={() => startEditPanel(panel)}
 										class="text-xs text-[var(--accent)] hover:underline"
 									>
 										Edit
 									</button>
 								</div>
-							{/if}
-							<div><span class="text-[var(--text-secondary)]">Area:</span> {selectedPanel.area_mm2} mm²</div>
-							<div><span class="text-[var(--text-secondary)]">Cut Length:</span> {selectedPanel.cut_length_mm} mm</div>
+							{/each}
 						</div>
 					</div>
 
@@ -430,7 +531,7 @@
 
 				<div>
 					<h3 class="text-xs font-semibold text-[var(--text-secondary)] uppercase mb-2">
-						Holes ({selectedPanel ? filteredHoles.length : 0})
+						Holes ({selectedPanels.length > 0 ? filteredHoles.length : 0})
 					</h3>
 					<div class="text-sm space-y-1 max-h-48 overflow-y-auto">
 						{#each filteredHoles as hole}
@@ -444,7 +545,7 @@
 
 				<div>
 					<h3 class="text-xs font-semibold text-[var(--text-secondary)] uppercase mb-2">
-						Labels ({selectedPanel ? filteredLabels.length : 0})
+						Labels ({selectedPanels.length > 0 ? filteredLabels.length : 0})
 					</h3>
 					<div class="text-sm space-y-1 max-h-96 overflow-y-auto">
 						{#each filteredLabels as label}
@@ -475,6 +576,6 @@
 		{coordinates}
 		scale={view.scale}
 		panelCount={pattern?.panels?.length || 0}
-		{selectedPanel}
+		selectedPanel={selectedPanels}
 	/>
 </div>

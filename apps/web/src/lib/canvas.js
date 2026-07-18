@@ -28,7 +28,23 @@ export function getLayerColor(layer) {
 	return COLORS.TEXT;
 }
 
-export function renderPattern(ctx, pattern, view, visibleLayers = null, selectedPanelId = null) {
+export function pointInPolygon(point, polygon) {
+	// Ray casting algorithm
+	let inside = false;
+	const x = point[0];
+	const y = point[1];
+	for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+		const xi = polygon[i][0];
+		const yi = polygon[i][1];
+		const xj = polygon[j][0];
+		const yj = polygon[j][1];
+		const intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+		if (intersect) inside = !inside;
+	}
+	return inside;
+}
+
+export function renderPattern(ctx, pattern, view, visibleLayers = null, selectedPanelIds = []) {
 	const { width, height, scale, offsetX, offsetY } = view;
 	ctx.clearRect(0, 0, width, height);
 	ctx.save();
@@ -50,7 +66,7 @@ export function renderPattern(ctx, pattern, view, visibleLayers = null, selected
 					ctx.lineTo(pts[i][0], pts[i][1]);
 				}
 				ctx.closePath();
-				const isSelected = selectedPanelId === panel.id;
+				const isSelected = selectedPanelIds.includes(panel.id);
 				ctx.fillStyle = isSelected ? 'rgba(249, 115, 22, 0.2)' : COLORS.PANEL_FILL;
 				ctx.fill();
 				ctx.strokeStyle = isSelected ? COLORS.SELECTED : COLORS.PANEL_OUTLINE;
