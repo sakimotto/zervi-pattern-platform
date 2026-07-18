@@ -98,9 +98,42 @@
 	export function loadPattern(patternData) {
 		if (!canvas) return;
 		canvas.clear();
-
-		// Set background
 		canvas.backgroundColor = '#0a0a0a';
+
+		// Compute bounding box of all entities
+		let minX = Infinity;
+		let minY = Infinity;
+		let maxX = -Infinity;
+		let maxY = -Infinity;
+
+		function expandBBox(x, y) {
+			minX = Math.min(minX, x);
+			minY = Math.min(minY, y);
+			maxX = Math.max(maxX, x);
+			maxY = Math.max(maxY, y);
+		}
+
+		if (patternData.panels) {
+			for (const panel of patternData.panels) {
+				for (const p of panel.polygon) {
+					expandBBox(p[0], p[1]);
+				}
+			}
+		}
+
+		if (patternData.holes) {
+			for (const hole of patternData.holes) {
+				expandBBox(hole.center[0], hole.center[1]);
+			}
+		}
+
+		if (patternData.labels) {
+			for (const label of patternData.labels) {
+				if (label.position) {
+					expandBBox(label.position[0], label.position[1]);
+				}
+			}
+		}
 
 		// Load panels as Fabric polygons
 		if (patternData.panels) {
@@ -151,6 +184,7 @@
 		// Load labels as Fabric text
 		if (patternData.labels) {
 			for (const label of patternData.labels) {
+				if (!label.position) continue;
 				const text = new fabric.Text(label.text, {
 					left: label.position[0],
 					top: label.position[1],
@@ -176,21 +210,34 @@
 		const objects = canvas.getObjects();
 		if (objects.length === 0) return;
 
-		const group = new fabric.Group(objects, { canvas });
-		const groupWidth = group.width || 1;
-		const groupHeight = group.height || 1;
+		// Compute bounding box of all objects
+		let minX = Infinity;
+		let minY = Infinity;
+		let maxX = -Infinity;
+		let maxY = -Infinity;
+
+		for (const obj of objects) {
+			const bound = obj.getBoundingRect();
+			minX = Math.min(minX, bound.left);
+			minY = Math.min(minY, bound.top);
+			maxX = Math.max(maxX, bound.left + bound.width);
+			maxY = Math.max(maxY, bound.top + bound.height);
+		}
+
+		const patternWidth = maxX - minX;
+		const patternHeight = maxY - minY;
 		const canvasWidth = canvas.getWidth();
 		const canvasHeight = canvas.getHeight();
+		const padding = 50;
 
-		const scaleX = canvasWidth / groupWidth;
-		const scaleY = canvasHeight / groupHeight;
-		const scale = Math.min(scaleX, scaleY) * 0.9;
+		const scaleX = (canvasWidth - padding * 2) / patternWidth;
+		const scaleY = (canvasHeight - padding * 2) / patternHeight;
+		const scale = Math.min(scaleX, scaleY);
 
 		canvas.setZoom(scale);
-		canvas.viewportTransform[4] = (canvasWidth - groupWidth * scale) / 2 - (group.left || 0) * scale;
-		canvas.viewportTransform[5] = (canvasHeight - groupHeight * scale) / 2 - (group.top || 0) * scale;
+		canvas.viewportTransform[4] = (canvasWidth - patternWidth * scale) / 2 - minX * scale;
+		canvas.viewportTransform[5] = (canvasHeight - patternHeight * scale) / 2 - minY * scale;
 		canvas.requestRenderAll();
-		group.destroy();
 	}
 
 	export function getSelectedObjects() {
