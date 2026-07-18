@@ -454,14 +454,17 @@
 	async function exportSelectedPanel() {
 		if (selectedPanels.length === 0) return;
 
-		const panel = selectedPanels[0];
-		const filename = panel.labels[0] || panel.id;
+		const filename =
+			selectedPanels.length === 1
+				? selectedPanels[0].labels[0] || selectedPanels[0].id
+				: `${selectedPanels.length}_panels`;
+
 		try {
-			const response = await fetch('/api/v1/patterns/export-panel', {
+			const response = await fetch('/api/v1/patterns/export-panels', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
-					panel,
+					panels: selectedPanels,
 					holes: pattern.holes,
 					labels: pattern.labels,
 					filename
@@ -619,7 +622,7 @@
 						on:click={exportSelectedPanel}
 						class="w-full px-3 py-2 text-sm bg-[var(--accent)] text-white rounded hover:opacity-90"
 					>
-						Export Selected Panel as DXF
+						Export {selectedPanels.length > 1 ? `${selectedPanels.length} Panels` : 'Selected Panel'} as DXF
 					</button>
 				{/if}
 

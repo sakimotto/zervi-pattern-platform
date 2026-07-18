@@ -4,13 +4,13 @@ from fastapi import APIRouter, File, UploadFile, HTTPException
 from pydantic import BaseModel
 
 from app.services.pattern_service import ingest_dxf
-from app.services.export_service import export_panel_to_dxf
+from app.services.export_service import export_panels_to_dxf
 
 router = APIRouter()
 
 
-class ExportPanelRequest(BaseModel):
-    panel: dict
+class ExportPanelsRequest(BaseModel):
+    panels: list
     holes: list
     labels: list
     filename: str
@@ -34,11 +34,11 @@ async def ingest_pattern(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Failed to parse DXF: {str(e)}")
 
 
-@router.post("/export-panel")
-async def export_panel(request: ExportPanelRequest):
-    """Export a single panel as DXF."""
+@router.post("/export-panels")
+async def export_panels(request: ExportPanelsRequest):
+    """Export multiple panels as DXF."""
     try:
-        return export_panel_to_dxf(request.panel, request.holes, request.labels, request.filename)
+        return export_panels_to_dxf(request.panels, request.holes, request.labels, request.filename)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to export DXF: {str(e)}")
 

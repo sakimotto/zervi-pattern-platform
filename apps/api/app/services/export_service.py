@@ -9,8 +9,8 @@ import ezdxf
 from fastapi.responses import FileResponse
 
 
-def export_panel_to_dxf(panel_data: dict, holes: list, labels: list, filename: str) -> FileResponse:
-    """Create a DXF file from panel data and return it as a download."""
+def export_panels_to_dxf(panels: list, holes: list, labels: list, filename: str) -> FileResponse:
+    """Create a DXF file from multiple panels and return it as a download."""
     doc = ezdxf.new("R2010")
     msp = doc.modelspace()
 
@@ -18,16 +18,18 @@ def export_panel_to_dxf(panel_data: dict, holes: list, labels: list, filename: s
     for layer_name in ["CUT", "NOTCH", "TEXT", "DIMS"]:
         doc.layers.add(layer_name)
 
-    # Add panel boundary as closed polyline
-    polygon = panel_data.get("polygon", [])
-    if polygon:
-        # ezdxf expects tuples of (x, y)
-        points = [(p[0], p[1]) for p in polygon]
-        msp.add_lwpolyline(points, close=True, dxfattribs={"layer": "CUT"})
+    panel_ids = {p.get("id") for p in panels}
+
+    # Add each panel boundary as closed polyline
+    for panel in panels:
+        polygon = panel.get("polygon", [])
+        if polygon:
+            points = [(p[0], p[1]) for p in polygon]
+            msp.add_lwpolyline(points, close=True, dxfattribs={"layer": "CUT"})
 
     # Add holes as circles
     for hole in holes:
-        if hole.get("inside_panel_id") == panel_data.get("id"):
+        if hole.get("inside_panel_id") in panel_ids:
             center = hole.get("center", [0, 0])
             radius = hole.get("radius_mm", 0)
             if radius > 0:
@@ -36,7 +38,7 @@ def export_panel_to_dxf(panel_data: dict, holes: list, labels: list, filename: s
 
     # Add labels
     for label in labels:
-        if label.get("linked_panel_id") == panel_data.get("id"):
+        if label.get("linked_panel_id") in panel_ids:
             text = label.get("text", "")
             position = label.get("position", [0, 0])
             height = label.get("height") or 10
