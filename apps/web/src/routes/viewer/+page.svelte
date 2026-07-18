@@ -589,6 +589,40 @@
 		}
 	}
 
+	async function applySeamAllowance() {
+		if (selectedPanels.length === 0) return;
+
+		const distance = prompt('Seam allowance (mm):', '10');
+		if (!distance || isNaN(parseFloat(distance))) return;
+
+		try {
+			const response = await fetch('/api/v1/patterns/seam-allowance', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					panels: selectedPanels,
+					distance_mm: parseFloat(distance)
+				})
+			});
+
+			if (!response.ok) throw new Error('Seam allowance failed');
+
+			const result = await response.json();
+			// Update panels with new geometry
+			for (const updatedPanel of result.panels) {
+				const idx = pattern.panels.findIndex((p) => p.id === updatedPanel.id);
+				if (idx >= 0) {
+					pattern.panels[idx] = updatedPanel;
+				}
+			}
+			pattern = pattern;
+			render();
+		} catch (e) {
+			console.error(e);
+			alert('Seam allowance failed');
+		}
+	}
+
 	$: filteredHoles =
 		selectedPanels.length > 0
 			? pattern.holes.filter((h) => selectedPanels.some((p) => p.id === h.inside_panel_id))
@@ -756,6 +790,13 @@
 						class="w-full px-3 py-2 text-sm bg-[var(--accent)] text-white rounded hover:opacity-90"
 					>
 						Export {selectedPanels.length > 1 ? `${selectedPanels.length} Panels` : 'Selected Panel'} as DXF
+					</button>
+
+					<button
+						on:click={applySeamAllowance}
+						class="w-full px-3 py-2 text-sm bg-[var(--success)] text-white rounded hover:opacity-90"
+					>
+						Apply Seam Allowance
 					</button>
 				{/if}
 
