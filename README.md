@@ -1,26 +1,24 @@
-# Zervi Pattern Platform
+# Zervi CAD
 
-AI-first design intelligence system for Zervi car seat cover manufacturing.
+Internal 2D CAD for Zervi car seat cover manufacturing, built on QCAD.
 
-## Current Status (2026-07-18)
+## New Direction (2026-07-18)
 
-**Working:**
-- DXF parsing and panel detection
-- Web-based CAD viewer with zoom/pan
-- Layer filtering and panel selection
-- CAD-style UI (menu bar, ribbon, file tabs, status bar, toolbox, block library)
-- API ingestion endpoint
-- Multi-select and export DXF
+**Foundation:** QCAD (GPLv3, 25 years mature, JavaScript scripting, DXF native)
 
-**Needs CAD Engine:**
-- Undo/redo
-- Entity editing (lines, arcs, circles)
-- Snap system
-- Trim/extend/fillet
-- Rotate/scale/mirror
-- Dimensioning
+**Plan:** See `docs/zervi-cad-plan.md` for detailed implementation plan.
 
-**Handover:** See `docs/handover-deepseek.md` for CAD engine development.
+**Previous work:** See `docs/handover-deepseek.md` for the web-based viewer prototype.
+
+## Vision
+
+Engineers use Zervi CAD (QCAD fork) as their 2D CAD tool. It has all of QCAD's CAD features plus Zervi-specific plugins for:
+- Pattern import and validation
+- Panel hierarchy (driver/passenger/cushion/seatback)
+- BOM generation
+- Block library for seat cover components
+- Odoo integration
+- AI agents
 
 ## Vision
 
