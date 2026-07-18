@@ -14,6 +14,9 @@
 	let view = { width: 0, height: 0, scale: 1, offsetX: 0, offsetY: 0 };
 	let isPanning = false;
 	let isSelecting = false;
+	let isTouchPanning = false;
+	let touchDistance = 0;
+	let touchCenter = { x: 0, y: 0 };
 	let panStart = { x: 0, y: 0 };
 	let selectStart = { x: 0, y: 0 };
 	let selectEnd = { x: 0, y: 0 };
@@ -248,6 +251,94 @@
 		canvas.style.cursor = 'grab';
 	}
 
+	// Touch handlers
+	function onTouchStart(e) {
+		e.preventDefault();
+		if (e.touches.length === 1) {
+			// Single touch: could be select or pan
+			const rect = canvas.getBoundingClientRect();
+			const mx = e.touches[0].clientX - rect.left;
+			const my = e.touches[0].clientY - rect.top;
+			const worldX = (mx - view.offsetX) / view.scale;
+			const worldY = (view.offsetY + view.height - my) / view.scale;
+
+			const clickedPanel = pattern.panels.find((panel) => pointInPolygon([worldX, worldY], panel.polygon));
+
+			if (clickedPanel) {
+				selectedPanels = [clickedPanel];
+				render();
+			} else {
+				// Start rubber band
+				isSelecting = true;
+				selectStart = { x: mx, y: my };
+				selectEnd = { x: mx, y: my };
+			}
+		} else if (e.touches.length === 2) {
+			// Two fingers: pinch to zoom
+			isTouchPanning = true;
+			const dx = e.touches[0].clientX - e.touches[1].clientX;
+			const dy = e.touches[0].clientY - e.touches[1].clientY;
+			touchDistance = Math.sqrt(dx * dx + dy * dy);
+			touchCenter = {
+				x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+				y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+			};
+		}
+	}
+
+	function onTouchMove(e) {
+		e.preventDefault();
+		if (isSelecting && e.touches.length === 1) {
+			const rect = canvas.getBoundingClientRect();
+			selectEnd = {
+				x: e.touches[0].clientX - rect.left,
+				y: e.touches[0].clientY - rect.top
+			};
+			render();
+		} else if (isTouchPanning && e.touches.length === 2) {
+			const dx = e.touches[0].clientX - e.touches[1].clientX;
+			const dy = e.touches[0].clientY - e.touches[1].clientY;
+			const newDistance = Math.sqrt(dx * dx + dy * dy);
+			const newCenter = {
+				x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+				y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+			};
+
+			// Zoom based on pinch distance change
+			if (touchDistance > 0) {
+				const zoom = newDistance / touchDistance;
+				const rect = canvas.getBoundingClientRect();
+				const mx = newCenter.x - rect.left;
+				const my = newCenter.y - rect.top;
+
+				const wx = (mx - view.offsetX) / view.scale;
+				const wy = (view.offsetY + view.height - my) / view.scale;
+
+				view.scale *= zoom;
+				view.offsetX = mx - wx * view.scale;
+				view.offsetY = my - (view.height - wy * view.scale);
+			}
+
+			// Pan based on center movement
+			view.offsetX += newCenter.x - touchCenter.x;
+			view.offsetY += newCenter.y - touchCenter.y;
+
+			touchDistance = newDistance;
+			touchCenter = newCenter;
+			render();
+		}
+	}
+
+	function onTouchEnd(e) {
+		if (isSelecting) {
+			isSelecting = false;
+			render();
+		}
+		if (isTouchPanning) {
+			isTouchPanning = false;
+		}
+	}
+
 	function toggleLayer(layer) {
 		if (visibleLayers.has(layer)) {
 			visibleLayers.delete(layer);
@@ -471,6 +562,9 @@
 					on:mousemove={onMouseMove}
 					on:mouseup={onMouseUp}
 					on:mouseleave={onMouseUp}
+					on:touchstart={onTouchStart}
+					on:touchmove={onTouchMove}
+					on:touchend={onTouchEnd}
 					class="w-full h-full cursor-grab"
 				></canvas>
 			</div>
