@@ -258,6 +258,39 @@
 		editName = '';
 	}
 
+	async function exportSelectedPanel() {
+		if (!selectedPanel) return;
+
+		const filename = selectedPanel.labels[0] || selectedPanel.id;
+		try {
+			const response = await fetch('/api/v1/patterns/export-panel', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					panel: selectedPanel,
+					holes: pattern.holes,
+					labels: pattern.labels,
+					filename
+				})
+			});
+
+			if (!response.ok) throw new Error('Export failed');
+
+			const blob = await response.blob();
+			const url = window.URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `${filename}.dxf`;
+			document.body.appendChild(a);
+			a.click();
+			a.remove();
+			window.URL.revokeObjectURL(url);
+		} catch (e) {
+			console.error(e);
+			alert('Export failed');
+		}
+	}
+
 	$: filteredHoles = selectedPanel
 		? pattern.holes.filter((h) => h.inside_panel_id === selectedPanel.id)
 		: [];
@@ -386,6 +419,13 @@
 							</div>
 						</div>
 					{/if}
+
+					<button
+						on:click={exportSelectedPanel}
+						class="w-full px-3 py-2 text-sm bg-[var(--accent)] text-white rounded hover:opacity-90"
+					>
+						Export Selected Panel as DXF
+					</button>
 				{/if}
 
 				<div>
