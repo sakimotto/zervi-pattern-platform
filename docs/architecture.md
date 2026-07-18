@@ -6,7 +6,34 @@ The Zervi Pattern Platform is an AI-first design intelligence system for car sea
 
 Major geometry changes (e.g., extending seam allowances, splitting assemblies) are performed by AI agents with specialized skills, not by generic CAD editing tools.
 
-## 2. Core Principles
+## 2. Current Implementation Status
+
+**As of 2026-07-18:**
+
+| Component | Status | Location |
+|-----------|--------|----------|
+| DXF parser | ✅ Working | `packages/dxf-parser/src/parser.py` |
+| Pattern engine | ✅ Working | `packages/pattern-engine/src/engine.py` |
+| API ingestion | ✅ Working | `apps/api/app/routers/patterns.py` |
+| Web viewer | ✅ Working | `apps/web/src/routes/viewer/+page.svelte` |
+| CAD-style UI | ✅ Working | `apps/web/src/lib/components/` |
+| Block library panel | ✅ Working | `apps/web/src/lib/components/BlockLibrary.svelte` |
+| File management | 🚧 In progress | File tabs exist, need real switching |
+| Basic editing | 🚧 In progress | Not yet implemented |
+| Export DXF | 📋 Planned | Not yet implemented |
+| Multi-level BOM | 📋 Planned | Schema exists, UI not built |
+| Odoo sync | 📋 Planned | Not yet implemented |
+
+**UI Components:**
+
+- `MenuBar.svelte` — File, Edit, View, Tools, Help menus
+- `RibbonTabs.svelte` — Home, View, Panels, BOM, Agents, Output tabs
+- `FileTabs.svelte` — Multiple open patterns
+- `StatusBar.svelte` — Coordinates, scale, selection info
+- `Toolbox.svelte` — Vertical toolbar (New, Open, Save, Export, Library, Settings)
+- `BlockLibrary.svelte` — Block categories, thumbnails, insert options
+
+## 3. Core Principles
 
 1. **CAD-agnostic:** Engineers keep their existing tools. DXF is the interchange format.
 2. **Design intelligence first:** Viewing, structuring, and analyzing patterns is the primary job.

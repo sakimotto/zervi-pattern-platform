@@ -2,6 +2,25 @@
 
 AI-first design intelligence system for Zervi car seat cover manufacturing.
 
+## Current Status (2026-07-18)
+
+**Working:**
+- DXF parsing and panel detection
+- Web-based CAD viewer with zoom/pan
+- Layer filtering and panel selection
+- CAD-style UI (menu bar, ribbon, file tabs, status bar, toolbox, block library)
+- API ingestion endpoint
+
+**In Progress:**
+- File management (multiple open patterns)
+- Basic editing (rename, move labels)
+- Export DXF
+
+**Planned:**
+- Multi-level BOM
+- Agent-driven geometry operations
+- Odoo integration
+
 ## Vision
 
 Engineers continue to draw in their existing 2D CAD tools (progeCAD, LibreCAD, AutoCAD). The platform imports the DXF files they export, structures the data into PostgreSQL + pgvector, and provides a web-based viewer and editor for pattern analysis, hierarchy management, and multi-level BOM generation.
@@ -52,21 +71,41 @@ zervi-pattern-platform/
 | DXF | `dxf-parser`, `ezdxf` |
 | Odoo | XML-RPC/JSON-RPC client |
 
-## Quick Start (Coming Soon)
+## Quick Start
 
 ```bash
 # Clone
 git clone https://github.com/sakimotto/zervi-pattern-platform.git
 cd zervi-pattern-platform
 
-# Install
-npm install
-pip install -r requirements.txt
+# Install Python deps
+python -m venv .venv
+.venv/Scripts/pip install fastapi uvicorn[standard] pydantic pydantic-settings ezdxf shapely python-multipart python-dotenv httpx
 
-# Run
-docker compose up -d db
+# Install Node deps
+cd apps/web
+npm install
+
+# Run API (in one terminal)
+cd apps/api
+../../.venv/Scripts/python.exe -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
+
+# Run Web (in another terminal)
+cd apps/web
 npm run dev
+
+# Open browser
+# http://localhost:5173/viewer
 ```
+
+## How to Resume After Crash
+
+1. Read `docs/plan.md` for current status and next steps
+2. Read `docs/architecture.md` for system design
+3. Check `git log` for latest commits
+4. Start API and web servers as above
+5. Open `http://localhost:5173/viewer`
+6. Upload a DXF from `D:\OneDrive\OneDrive - Zervi Asia Co., Ltd\Documents\LBRECAD-TEST\`
 
 ## License
 
