@@ -88,6 +88,21 @@ export function renderPattern(ctx, pattern, view, visibleLayers = null, selected
 		}
 	}
 
+	// Draw custom entities (user-drawn lines, etc.)
+	if (pattern.entities) {
+		for (const entity of pattern.entities) {
+			if (visibleLayers && !visibleLayers.has(entity.layer)) continue;
+			if (entity.type === 'LINE') {
+				ctx.beginPath();
+				ctx.moveTo(entity.geometry.start[0], entity.geometry.start[1]);
+				ctx.lineTo(entity.geometry.end[0], entity.geometry.end[1]);
+				ctx.strokeStyle = COLORS.CUT;
+				ctx.lineWidth = 1.5 / scale;
+				ctx.stroke();
+			}
+		}
+	}
+
 	// Draw labels
 	if (pattern.labels) {
 		for (const label of pattern.labels) {

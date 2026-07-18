@@ -28,6 +28,12 @@
 	let activeFile = null;
 	let showLibrary = false;
 	let editingPanel = null;
+
+	// CAD editing modes
+	let editMode = 'select'; // select, move, draw-line, add-notch
+	let movingPanel = null;
+	let moveOffset = { x: 0, y: 0 };
+	let drawLineStart = null;
 	let editName = '';
 
 	onMount(async () => {
@@ -127,6 +133,28 @@
 			ctx.strokeRect(minX, minY, maxX - minX, maxY - minY);
 			ctx.restore();
 		}
+
+		// Draw line preview when in draw-line mode
+		if (editMode === 'draw-line' && drawLineStart) {
+			const worldX = coordinates.x;
+			const worldY = coordinates.y;
+
+			// Convert to screen coordinates
+			const sx = drawLineStart.x * view.scale + view.offsetX;
+			const sy = view.height - (drawLineStart.y * view.scale + view.offsetY);
+			const ex = worldX * view.scale + view.offsetX;
+			const ey = view.height - (worldY * view.scale + view.offsetY);
+
+			ctx.save();
+			ctx.strokeStyle = '#4ade80';
+			ctx.lineWidth = 2;
+			ctx.setLineDash([5, 5]);
+			ctx.beginPath();
+			ctx.moveTo(sx, sy);
+			ctx.lineTo(ex, ey);
+			ctx.stroke();
+			ctx.restore();
+		}
 	}
 
 	function onWheel(e) {
@@ -146,27 +174,65 @@
 	}
 
 	function onMouseDown(e) {
-		if (e.button === 0) {
-			// Left click: check if clicking on a panel
-			const rect = canvas.getBoundingClientRect();
-			const mx = e.clientX - rect.left;
-			const my = e.clientY - rect.top;
-			const worldX = (mx - view.offsetX) / view.scale;
-			const worldY = (view.offsetY + view.height - my) / view.scale;
+		const rect = canvas.getBoundingClientRect();
+		const mx = e.clientX - rect.left;
+		const my = e.clientY - rect.top;
+		const worldX = (mx - view.offsetX) / view.scale;
+		const worldY = (view.offsetY + view.height - my) / view.scale;
 
-			// Find panel under click
+		if (e.button === 0) {
+			if (editMode === 'move' && selectedPanels.length > 0) {
+				// Start moving selected panels
+				movingPanel = selectedPanels[0];
+				moveOffset = { x: worldX - movingPanel.centroid[0], y: worldY - movingPanel.centroid[1] };
+				return;
+			}
+
+			if (editMode === 'draw-line') {
+				if (!drawLineStart) {
+					drawLineStart = { x: worldX, y: worldY };
+				} else {
+					// Finish line
+					pattern.entities = pattern.entities || [];
+					pattern.entities.push({
+						type: 'LINE',
+						layer: 'CUT',
+						geometry: {
+							start: [drawLineStart.x, drawLineStart.y],
+							end: [worldX, worldY]
+						}
+					});
+					drawLineStart = null;
+					render();
+				}
+				return;
+			}
+
+			if (editMode === 'add-notch') {
+				// Add a notch at click position
+				pattern.holes.push({
+					center: [worldX, worldY],
+					radius_mm: 13,
+					diameter_mm: 26,
+					classification: 'notch',
+					layer: 'NOTCH',
+					inside_panel_id: null
+				});
+				render();
+				return;
+			}
+
+			// Default: select mode
 			const clickedPanel = pattern.panels.find((panel) => pointInPolygon([worldX, worldY], panel.polygon));
 
 			if (clickedPanel) {
 				if (e.ctrlKey || e.metaKey) {
-					// Ctrl+click: toggle selection
 					if (selectedPanels.find((p) => p.id === clickedPanel.id)) {
 						selectedPanels = selectedPanels.filter((p) => p.id !== clickedPanel.id);
 					} else {
 						selectedPanels = [...selectedPanels, clickedPanel];
 					}
 				} else {
-					// Single click: select only this panel
 					selectedPanels = [clickedPanel];
 				}
 				render();
@@ -190,7 +256,7 @@
 		const mx = e.clientX - rect.left;
 		const my = e.clientY - rect.top;
 
-		if (!isPanning && !isSelecting) {
+		if (!isPanning && !isSelecting && !movingPanel) {
 			// Update coordinates
 			coordinates = {
 				x: (mx - view.offsetX) / view.scale,
@@ -205,6 +271,28 @@
 			return;
 		}
 
+		if (movingPanel) {
+			const worldX = (mx - view.offsetX) / view.scale;
+			const worldY = (view.offsetY + view.height - my) / view.scale;
+			const dx = worldX - moveOffset.x - movingPanel.centroid[0];
+			const dy = worldY - moveOffset.y - movingPanel.centroid[1];
+
+			// Move all selected panels
+			for (const panel of selectedPanels) {
+				for (const pt of panel.polygon) {
+					pt[0] += dx;
+					pt[1] += dy;
+				}
+				panel.centroid[0] += dx;
+				panel.centroid[1] += dy;
+			}
+
+			// Update move offset for next frame
+			moveOffset = { x: worldX - movingPanel.centroid[0], y: worldY - movingPanel.centroid[1] };
+			render();
+			return;
+		}
+
 		if (isPanning) {
 			view.offsetX += e.clientX - panStart.x;
 			view.offsetY += e.clientY - panStart.y;
@@ -214,6 +302,12 @@
 	}
 
 	function onMouseUp(e) {
+		if (movingPanel) {
+			movingPanel = null;
+			render();
+			return;
+		}
+
 		if (isSelecting) {
 			// Finish rubber band selection
 			const minX = Math.min(selectStart.x, selectEnd.x);
@@ -337,6 +431,13 @@
 		if (isTouchPanning) {
 			isTouchPanning = false;
 		}
+	}
+
+	function setEditMode(mode) {
+		editMode = mode;
+		movingPanel = null;
+		drawLineStart = null;
+		canvas.style.cursor = mode === 'select' ? 'default' : mode === 'move' ? 'move' : 'crosshair';
 	}
 
 	function toggleLayer(layer) {
@@ -558,6 +659,38 @@
 
 			<!-- Canvas -->
 			<div class="flex-1 relative bg-[#0a0a0a]">
+				<!-- Edit Mode Toolbar -->
+				<div class="absolute top-2 left-2 z-10 flex gap-1 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded p-1">
+					<button
+						on:click={() => setEditMode('select')}
+						class="px-2 py-1 text-sm rounded {editMode === 'select' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'}"
+						title="Select"
+					>
+						⬚ Select
+					</button>
+					<button
+						on:click={() => setEditMode('move')}
+						class="px-2 py-1 text-sm rounded {editMode === 'move' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'}"
+						title="Move Panels"
+					>
+						✥ Move
+					</button>
+					<button
+						on:click={() => setEditMode('draw-line')}
+						class="px-2 py-1 text-sm rounded {editMode === 'draw-line' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'}"
+						title="Draw Line"
+					>
+						╱ Line
+					</button>
+					<button
+						on:click={() => setEditMode('add-notch')}
+						class="px-2 py-1 text-sm rounded {editMode === 'add-notch' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'}"
+						title="Add Notch"
+					>
+						◉ Notch
+					</button>
+				</div>
+
 				<canvas
 					bind:this={canvas}
 					on:wheel={onWheel}
