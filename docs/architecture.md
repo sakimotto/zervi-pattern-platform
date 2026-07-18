@@ -13,14 +13,14 @@ Major geometry changes (e.g., extending seam allowances, splitting assemblies) a
 | Component | Status | Location |
 |-----------|--------|----------|
 | DXF parser | ✅ Working | `packages/dxf-parser/src/parser.py` |
-| Pattern engine | ✅ Working | `packages/pattern-engine/src/engine.py` |
+| Pattern engine | 🚧 Refactoring | `packages/pattern-engine/src/engine.py` — moving to Clipper2 |
 | API ingestion | ✅ Working | `apps/api/app/routers/patterns.py` |
 | Web viewer | ✅ Working | `apps/web/src/routes/viewer/+page.svelte` |
 | CAD-style UI | ✅ Working | `apps/web/src/lib/components/` |
 | Block library panel | ✅ Working | `apps/web/src/lib/components/BlockLibrary.svelte` |
-| File management | 🚧 In progress | File tabs exist, need real switching |
-| Basic editing | 🚧 In progress | Not yet implemented |
-| Export DXF | 📋 Planned | Not yet implemented |
+| File management | ✅ Working | File tabs, close, dirty state |
+| Basic editing | ✅ Working | Rename, move, draw line, add notch |
+| Export DXF | ✅ Working | Export selected panels |
 | Multi-level BOM | 📋 Planned | Schema exists, UI not built |
 | Odoo sync | 📋 Planned | Not yet implemented |
 
@@ -33,13 +33,23 @@ Major geometry changes (e.g., extending seam allowances, splitting assemblies) a
 - `Toolbox.svelte` — Vertical toolbar (New, Open, Save, Export, Library, Settings)
 - `BlockLibrary.svelte` — Block categories, thumbnails, insert options
 
-## 3. Core Principles
+## 3. CAD Library Stack
 
-1. **CAD-agnostic:** Engineers keep their existing tools. DXF is the interchange format.
-2. **Design intelligence first:** Viewing, structuring, and analyzing patterns is the primary job.
-3. **Basic editing, agent-driven major work:** Small edits in UI; big changes via agents.
-4. **Multi-level BOM is core:** Break single-level patterns into driver/passenger/cushion/seatback/headrest/sub-assemblies.
-5. **Local-first, Odoo-integrated:** Data lives in PostgreSQL + pgvector; BOMs sync to Odoo when ready.
+**Do not build custom geometry code.** Use existing open-source libraries:
+
+| Library | Purpose | Status |
+|---------|---------|--------|
+| **Clipper2** | 2D booleans, offsets, polygon operations | 🚧 Being integrated |
+| **ezdxf** | DXF read/write | ✅ Working |
+| **libredwg** | DWG import | 📋 Planned |
+| **PlaneGCS / libslvs** | Constraint solving | 📋 Future |
+| **LibreCAD source** | CAD operation reference | 📋 Reference only |
+
+**What we removed:** Custom shapely polygonization, custom endpoint snapping, custom point-in-polygon.
+
+**What we keep:** Current UI, canvas rendering, and editing features.
+
+## 4. Core Principles
 
 ## 3. High-Level Architecture
 
