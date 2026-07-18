@@ -1,6 +1,10 @@
 <script>
 	import { onMount, tick } from 'svelte';
 	import { renderPattern, fitToView, getLayerColor } from '$lib/canvas.js';
+	import MenuBar from '$lib/components/MenuBar.svelte';
+	import RibbonTabs from '$lib/components/RibbonTabs.svelte';
+	import FileTabs from '$lib/components/FileTabs.svelte';
+	import StatusBar from '$lib/components/StatusBar.svelte';
 
 	let pattern = null;
 	let canvas;
@@ -10,12 +14,25 @@
 	let panStart = { x: 0, y: 0 };
 	let selectedPanel = null;
 	let visibleLayers = new Set();
+	let coordinates = { x: 0, y: 0 };
+
+	let files = [];
+	let activeFile = null;
 
 	onMount(async () => {
 		const stored = sessionStorage.getItem('zervi-pattern');
 		if (stored) {
 			try {
 				pattern = JSON.parse(stored);
+				files = [
+					{
+						name: pattern.filename || 'Untitled',
+						active: true,
+						dirty: false,
+						pattern
+					}
+				];
+				activeFile = files[0];
 				initLayers();
 				await tick();
 				initCanvas();
@@ -62,7 +79,6 @@
 		const mx = e.clientX - rect.left;
 		const my = e.clientY - rect.top;
 
-		// World coords before zoom (accounting for Y-flip)
 		const wx = (mx - view.offsetX) / view.scale;
 		const wy = (view.offsetY + view.height - my) / view.scale;
 
@@ -79,7 +95,17 @@
 	}
 
 	function onMouseMove(e) {
-		if (!isPanning) return;
+		if (!isPanning) {
+			// Update coordinates
+			const rect = canvas.getBoundingClientRect();
+			const mx = e.clientX - rect.left;
+			const my = e.clientY - rect.top;
+			coordinates = {
+				x: (mx - view.offsetX) / view.scale,
+				y: (view.offsetY + view.height - my) / view.scale
+			};
+			return;
+		}
 		view.offsetX += e.clientX - panStart.x;
 		view.offsetY += e.clientY - panStart.y;
 		panStart = { x: e.clientX, y: e.clientY };
@@ -106,6 +132,74 @@
 		render();
 	}
 
+	function handleMenuAction(e) {
+		const action = e.detail;
+		console.log('Menu action:', action);
+		if (action === 'fit') fitView();
+		if (action === 'open') {
+			// Trigger file input
+			document.getElementById('file-input')?.click();
+		}
+	}
+
+	function handleFileSelect(e) {
+		const file = e.detail;
+		activeFile = file;
+		pattern = file.pattern;
+		initLayers();
+		fitView();
+		render();
+	}
+
+	function handleFileClose(e) {
+		const file = e.detail;
+		files = files.filter((f) => f !== file);
+		if (activeFile === file) {
+			activeFile = files[0] || null;
+			pattern = activeFile?.pattern || null;
+			if (pattern) {
+				initLayers();
+				fitView();
+				render();
+			}
+		}
+	}
+
+	function handleNewFile() {
+		document.getElementById('file-input')?.click();
+	}
+
+	async function handleUpload(event) {
+		const file = event.target.files[0];
+		if (!file) return;
+
+		const formData = new FormData();
+		formData.append('file', file);
+
+		try {
+			const response = await fetch('/api/v1/patterns/ingest', {
+				method: 'POST',
+				body: formData
+			});
+			const result = await response.json();
+			const newFile = {
+				name: result.filename || 'Untitled',
+				active: true,
+				dirty: false,
+				pattern: result
+			};
+			files = [...files.map((f) => ({ ...f, active: false })), newFile];
+			activeFile = newFile;
+			pattern = result;
+			initLayers();
+			fitView();
+			render();
+		} catch (error) {
+			console.error(error);
+			alert('Upload failed');
+		}
+	}
+
 	$: filteredHoles = selectedPanel
 		? pattern.holes.filter((h) => h.inside_panel_id === selectedPanel.id)
 		: [];
@@ -115,15 +209,21 @@
 		: [];
 </script>
 
+<svelte:head>
+	<title>Zervi Pattern Platform</title>
+</svelte:head>
+
+<input type="file" id="file-input" accept=".dxf" class="hidden" on:change={handleUpload} />
+
 <div class="h-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden">
-	<!-- Toolbar -->
-	<div class="flex items-center gap-4 px-4 py-2 bg-[var(--bg-secondary)] border-b border-[var(--border-color)]">
-		<a href="/" class="text-sm text-[var(--accent)] hover:underline">← Back</a>
-		<div class="h-4 w-px bg-[var(--border-color)]"></div>
-		<button on:click={fitView} class="text-sm px-3 py-1 rounded bg-[var(--bg-elevated)] hover:bg-[var(--border-color)]">Fit View</button>
-		<div class="flex-1"></div>
-		<span class="text-sm text-[var(--text-secondary)]">{pattern?.filename || 'No pattern loaded'}</span>
-	</div>
+	<MenuBar on:action={handleMenuAction} />
+	<RibbonTabs on:action={handleMenuAction} />
+	<FileTabs
+		{files}
+		on:select={handleFileSelect}
+		on:close={handleFileClose}
+		on:new={handleNewFile}
+	/>
 
 	{#if pattern}
 		<div class="flex flex-1 overflow-hidden">
@@ -218,8 +318,20 @@
 			<div class="text-center space-y-4">
 				<div class="text-6xl">📐</div>
 				<p class="text-[var(--text-secondary)]">No pattern loaded. Upload a DXF file first.</p>
-				<a href="/" class="text-[var(--accent)] hover:underline">Go to Upload</a>
+				<button
+					on:click={handleNewFile}
+					class="px-4 py-2 rounded bg-[var(--accent)] text-white hover:opacity-90"
+				>
+					Upload DXF
+				</button>
 			</div>
 		</div>
 	{/if}
+
+	<StatusBar
+		{coordinates}
+		scale={view.scale}
+		panelCount={pattern?.panels?.length || 0}
+		{selectedPanel}
+	/>
 </div>
