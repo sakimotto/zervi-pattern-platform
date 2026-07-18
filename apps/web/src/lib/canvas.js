@@ -31,6 +31,11 @@ export function getLayerColor(layer) {
 export function renderPattern(ctx, pattern, view) {
 	const { width, height, scale, offsetX, offsetY } = view;
 	ctx.clearRect(0, 0, width, height);
+
+	// Test: draw a red rectangle at a fixed position to verify canvas works
+	ctx.fillStyle = 'red';
+	ctx.fillRect(10, 10, 100, 100);
+
 	ctx.save();
 
 	// Apply view transform with Y-flip:

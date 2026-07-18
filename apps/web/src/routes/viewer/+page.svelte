@@ -11,12 +11,21 @@
 	let selectedPanel = null;
 	let visibleLayers = new Set();
 
+	let debugInfo = 'Loading...';
+
 	onMount(() => {
 		const stored = sessionStorage.getItem('zervi-pattern');
+		debugInfo = stored ? 'Found pattern in sessionStorage' : 'No pattern in sessionStorage';
 		if (stored) {
-			pattern = JSON.parse(stored);
-			initLayers();
-			initCanvas();
+			try {
+				pattern = JSON.parse(stored);
+				debugInfo += `\nParsed: ${pattern.panels?.length || 0} panels, ${pattern.holes?.length || 0} holes, ${pattern.labels?.length || 0} labels`;
+				debugInfo += `\nBBox: ${JSON.stringify(pattern.bounding_box)}`;
+				initLayers();
+				initCanvas();
+			} catch (e) {
+				debugInfo += `\nParse error: ${e.message}`;
+			}
 		}
 	});
 
@@ -27,12 +36,16 @@
 	}
 
 	function initCanvas() {
-		if (!canvas) return;
+		if (!canvas) {
+			debugInfo += '\nNo canvas element';
+			return;
+		}
 		canvas.width = canvas.offsetWidth;
 		canvas.height = canvas.offsetHeight;
 		ctx = canvas.getContext('2d');
 		view.width = canvas.width;
 		view.height = canvas.height;
+		debugInfo += `\nCanvas: ${view.width}x${view.height}`;
 		fitView();
 		render();
 	}
@@ -43,11 +56,16 @@
 		view.scale = scale;
 		view.offsetX = offsetX;
 		view.offsetY = offsetY;
+		debugInfo += `\nView: scale=${scale.toFixed(6)}, offset=(${offsetX.toFixed(1)}, ${offsetY.toFixed(1)})`;
 	}
 
 	function render() {
-		if (!ctx || !pattern) return;
+		if (!ctx || !pattern) {
+			debugInfo += '\nRender skipped: no ctx or pattern';
+			return;
+		}
 		renderPattern(ctx, pattern, view);
+		debugInfo += '\nRender complete';
 	}
 
 	function onWheel(e) {
@@ -157,6 +175,10 @@
 
 			<!-- Right Sidebar -->
 			<div class="w-80 bg-[var(--bg-secondary)] border-l border-[var(--border-color)] overflow-y-auto p-3 space-y-4">
+				<div>
+					<h3 class="text-xs font-semibold text-[var(--text-secondary)] uppercase mb-2">Debug</h3>
+					<pre class="text-xs text-[var(--text-secondary)] whitespace-pre-wrap bg-[var(--bg-elevated)] p-2 rounded">{debugInfo}</pre>
+				</div>
 				{#if selectedPanel}
 					<div>
 						<h3 class="text-xs font-semibold text-[var(--text-secondary)] uppercase mb-2">Selected Panel</h3>
