@@ -1,6 +1,8 @@
 """Pattern ingestion and management endpoints."""
 
-from fastapi import APIRouter, File, UploadFile
+from fastapi import APIRouter, File, UploadFile, HTTPException
+
+from app.services.pattern_service import ingest_dxf
 
 router = APIRouter()
 
@@ -14,11 +16,13 @@ async def list_patterns():
 @router.post("/ingest")
 async def ingest_pattern(file: UploadFile = File(...)):
     """Ingest a DXF file using the Zervi template."""
-    return {
-        "filename": file.filename,
-        "status": "queued",
-        "message": "Ingestion not yet implemented",
-    }
+    if not file.filename or not file.filename.lower().endswith(".dxf"):
+        raise HTTPException(status_code=400, detail="Only DXF files are supported")
+
+    try:
+        return await ingest_dxf(file)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse DXF: {str(e)}")
 
 
 @router.get("/{pattern_id}")
