@@ -10,16 +10,17 @@ AI-first design intelligence system for Zervi car seat cover manufacturing.
 - Layer filtering and panel selection
 - CAD-style UI (menu bar, ribbon, file tabs, status bar, toolbox, block library)
 - API ingestion endpoint
+- Multi-select and export DXF
 
-**In Progress:**
-- File management (multiple open patterns)
-- Basic editing (rename, move labels)
-- Export DXF
+**Needs CAD Engine:**
+- Undo/redo
+- Entity editing (lines, arcs, circles)
+- Snap system
+- Trim/extend/fillet
+- Rotate/scale/mirror
+- Dimensioning
 
-**Planned:**
-- Multi-level BOM
-- Agent-driven geometry operations
-- Odoo integration
+**Handover:** See `docs/handover-deepseek.md` for CAD engine development.
 
 ## Vision
 
@@ -44,7 +45,8 @@ zervi-pattern-platform/
 ├── docs/
 │   ├── architecture.md      # System architecture
 │   ├── plan.md              # Implementation plan
-│   └── handover-k3-ui.md    # UI/UX handover for Kimi K3
+│   ├── handover-k3-ui.md    # UI/UX handover for Kimi K3
+│   └── handover-deepseek.md # CAD engine handover for DeepSeek
 ├── scripts/                 # Automation scripts
 └── tests/                   # Shared fixtures and e2e tests
 ```
