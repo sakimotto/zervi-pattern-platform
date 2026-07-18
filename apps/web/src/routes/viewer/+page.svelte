@@ -244,6 +244,10 @@
 		// Mark file as dirty
 		activeFile.dirty = true;
 
+		// Force Svelte reactivity so the left panel list updates
+		pattern = pattern;
+		files = files;
+
 		editingPanel = null;
 		editName = '';
 		render();
