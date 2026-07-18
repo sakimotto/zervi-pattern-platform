@@ -1,5 +1,5 @@
 <script>
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { renderPattern, fitToView, getLayerColor } from '$lib/canvas.js';
 
 	let pattern = null;
@@ -13,7 +13,7 @@
 
 	let debugInfo = 'Loading...';
 
-	onMount(() => {
+	onMount(async () => {
 		const stored = sessionStorage.getItem('zervi-pattern');
 		debugInfo = stored ? 'Found pattern in sessionStorage' : 'No pattern in sessionStorage';
 		if (stored) {
@@ -22,6 +22,7 @@
 				debugInfo += `\nParsed: ${pattern.panels?.length || 0} panels, ${pattern.holes?.length || 0} holes, ${pattern.labels?.length || 0} labels`;
 				debugInfo += `\nBBox: ${JSON.stringify(pattern.bounding_box)}`;
 				initLayers();
+				await tick();
 				initCanvas();
 			} catch (e) {
 				debugInfo += `\nParse error: ${e.message}`;
