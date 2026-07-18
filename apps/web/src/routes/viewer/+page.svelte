@@ -5,6 +5,8 @@
 	import RibbonTabs from '$lib/components/RibbonTabs.svelte';
 	import FileTabs from '$lib/components/FileTabs.svelte';
 	import StatusBar from '$lib/components/StatusBar.svelte';
+	import Toolbox from '$lib/components/Toolbox.svelte';
+	import BlockLibrary from '$lib/components/BlockLibrary.svelte';
 
 	let pattern = null;
 	let canvas;
@@ -18,6 +20,7 @@
 
 	let files = [];
 	let activeFile = null;
+	let showLibrary = false;
 
 	onMount(async () => {
 		const stored = sessionStorage.getItem('zervi-pattern');
@@ -137,9 +140,24 @@
 		console.log('Menu action:', action);
 		if (action === 'fit') fitView();
 		if (action === 'open') {
-			// Trigger file input
 			document.getElementById('file-input')?.click();
 		}
+	}
+
+	function handleToolboxAction(e) {
+		const action = e.detail;
+		if (action === 'open') {
+			document.getElementById('file-input')?.click();
+		} else if (action === 'library') {
+			showLibrary = !showLibrary;
+		}
+	}
+
+	function handleBlockInsert(e) {
+		const { block, options } = e.detail;
+		console.log('Insert block:', block, options);
+		// TODO: Implement block insertion into canvas
+		alert(`Insert ${block.name} (scale=${options.scale}, angle=${options.angle})`);
 	}
 
 	function handleFileSelect(e) {
@@ -227,6 +245,16 @@
 
 	{#if pattern}
 		<div class="flex flex-1 overflow-hidden">
+			<!-- Toolbox -->
+			<Toolbox on:action={handleToolboxAction} />
+
+			<!-- Block Library -->
+			{#if showLibrary}
+				<div class="w-80 border-r border-[var(--border-color)]">
+					<BlockLibrary on:insert={handleBlockInsert} />
+				</div>
+			{/if}
+
 			<!-- Left Sidebar -->
 			<div class="w-64 bg-[var(--bg-secondary)] border-r border-[var(--border-color)] overflow-y-auto p-3 space-y-4">
 				<div>
